@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>CheckStock</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f4f4f4; }
+        .form-container { background: #f9f9f9; padding: 15px; border-radius: 5px; max-width: 400px; }
+        input, select { width: 100%; margin-bottom: 10px; padding: 5px; }
+        button { padding: 10px; background: #28a745; color: white; border: none; cursor: pointer; }
+        button:hover { background: #218838; }
+        .error { color: red; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>CheckStock — остатки и движения</h1>
+
+    <h2>Остатки</h2>
+    <table id="stock-table">
+        <thead>
+            <tr><th>Товар</th><th>Склад</th><th>Количество</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <h2>История движений (последние 20)</h2>
+    <table id="movement-table">
+        <thead>
+            <tr><th>Время</th><th>Товар</th><th>Тип</th><th>Кол-во</th></tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <div class="form-container">
+        <h3>Создать движение</h3>
+        <form id="movement-form">
+            <select id="product_id">
+                <option value="1">Органайзер</option>
+                <option value="2">Кошелек</option>
+            </select>
+            <select id="type">
+                <option value="receipt">Приход</option>
+                <option value="shipment">Отгрузка</option>
+                <option value="transfer">Перемещение</option>
+            </select>
+            <select id="from_warehouse_id">
+                <option value="1">Магазин 01 (FBS)</option>
+                <option value="2">Склад WB (FBO)</option>
+            </select>
+            <select id="to_warehouse_id">
+                <option value="1">Магазин 01 (FBS)</option>
+                <option value="2">Склад WB (FBO)</option>
+            </select>
+            <input type="number" id="quantity" placeholder="Количество" value="1" min="1">
+            <button type="submit">Создать</button>
+        </form>
+        <div id="error-msg" class="error"></div>
+    </div>
+
+    <script>
+        async function loadData() {
+            const stocks = await (await fetch('/api/stocks')).json();
+            const tbody = document.querySelector('#stock-table tbody');
+            tbody.innerHTML = stocks.map(s => `<tr><td>${s.product_name}</td><td>${s.warehouse_name}</td><td>${s.quantity}</td></tr>`).join('');
+
+            const movements = await (await fetch('/api/movements')).json();
+            const mTbody = document.querySelector('#movement-table tbody');
+            mTbody.innerHTML = movements.map(m => `<tr><td>${m.created_at}</td><td>${m.product}</td><td>${m.type}</td><td>${m.quantity}</td></tr>`).join('');
+        }
+
+        document.getElementById('movement-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errDiv = document.getElementById('error-msg');
+            errDiv.textContent = '';
+
+            const data = {
+                product_id: parseInt(document.getElementById('product_id').value),
+                type: document.getElementById('type').value,
+                from_warehouse_id: parseInt(document.getElementById('from_warehouse_id').value),
+                to_warehouse_id: parseInt(document.getElementById('to_warehouse_id').value),
+                quantity: parseInt(document.getElementById('quantity').value)
+            };
+
+            const res = await fetch('/api/movements', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            });
+
+            if (res.ok) {
+                loadData();
+            } else {
+                const err = await res.json();
+                errDiv.textContent = err.detail;
+            }
+        });
+
+        // Инициализация данных при загрузке
+        fetch('/api/seed', { method: 'POST' }).then(() => loadData());
+    </script>
+</body>
+</html>
